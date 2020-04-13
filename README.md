@@ -52,7 +52,7 @@ All configuration of `dirsync` is handled by the `.dirsync` directory, which is 
 ```
 .dirsync/
 ├── actions
-│   └── onFileDidChange
+│   └── onSyncDidFinish
 │       └── remote
 ├── config.json
 └── ignore
