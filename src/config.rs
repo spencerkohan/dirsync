@@ -1,10 +1,7 @@
-
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use crate::cli::RemoteConfigRecord;
-// use std::error::Error;
-// use ssh_config::SSHConfig;
 
 use crate::cli::CliOptions;
 
@@ -29,7 +26,6 @@ impl Config {
     }
 }
 
-
 impl RemoteConfigRecord {
     fn host_string(&self) -> String {
         let mut s: String = String::new();
@@ -48,9 +44,7 @@ pub struct SessionConfig {
     pub local_root: String,
     pub remote: RemoteConfigRecord,
     pub ignore_gitignore: bool,
-    
 }
-
 
 impl SessionConfig {
 

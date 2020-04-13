@@ -89,7 +89,6 @@ fn filter(event: DebouncedEvent) -> Option<DebouncedEvent> {
 
 
 fn start_main_loop(config: &SessionConfig) {
-
     println!("config: {:?}", config);
 
     rsync(&config);
@@ -122,7 +121,6 @@ fn start_main_loop(config: &SessionConfig) {
 
 
 fn main() {
-    
     let opts = CliOptions::from_args();
 
     match opts.subcommand {

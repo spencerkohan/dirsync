@@ -21,8 +21,6 @@ pub struct CliOptions {
     pub subcommand: Option<SubCommand>
 }
 
-
-
 #[derive(Debug)]
 #[derive(StructOpt)]
 #[derive(Clone)]

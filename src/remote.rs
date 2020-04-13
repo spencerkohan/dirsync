@@ -3,33 +3,10 @@ use std::io::prelude::*;
 use std::net::TcpStream;
 use std::path::PathBuf;
 
-
 use ssh2::Session;
 use ssh2::ExtendedData;
 use crate::config::SessionConfig;
 
-// pub fn echo() {
-
-//     let tcp = TcpStream::connect("pc:22").unwrap();
-//     let mut sess = Session::new().unwrap();
-//     sess.set_tcp_stream(tcp);
-//     sess.handshake().unwrap();
-
-//     // Try to authenticate with the first identity in the agent.
-//     sess.userauth_agent("skohan").unwrap();
-
-//     // Make sure we succeeded
-//     assert!(sess.authenticated());
-
-//     let mut channel = sess.channel_session().unwrap();
-//     channel.exec("ls").unwrap();
-//     let mut s = String::new();
-//     channel.read_to_string(&mut s).unwrap();
-//     println!("{}", s);
-//     channel.wait_close();
-//     println!("{}", channel.exit_status().unwrap());
-
-// }
 
 pub struct Remote {
     session: ssh2::Session,
@@ -40,7 +17,6 @@ impl Remote {
 
     // todo: this shouold take configuration arguemnts
     pub fn connect(config: &SessionConfig) -> Remote {
-
         let tcp = TcpStream::connect(
             &config.host_port_string().as_str()
         ).unwrap();
@@ -61,11 +37,9 @@ impl Remote {
             session: sess,
             root: root
         }
-
     }
 
     fn exec(&mut self, command: &str) -> String {
-
         let path = self.root.clone();
         let path_str = path.to_str().unwrap();
         let cmd = &format!("cd {} && {}", &path_str, &command);
@@ -124,7 +98,6 @@ impl Remote {
         
         let command2 = &format!("{}", &path_str);
         self.exec_stream(&command2);
-
     }
 
 }
