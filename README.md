@@ -6,9 +6,16 @@ This tool should be easy to understand for those who are already familiar with `
 
 ## Installation
 
-The easiest way to install 
+The easiest way to install dirsync is with cargo install:
 
-**Note: this crate relies on openssl to be installed on the system.  Instructions can be found [here](https://docs.rs/openssl/0.10.29/openssl/)
+```
+// clone the repo:
+$ git clone https://github.com/spencerkohan/dirsync && cd dirsync
+// install
+$ cargo install --path .
+``` 
+
+***Note:*** this crate relies on openssl to be installed on the system.  Instructions can be found [here](https://docs.rs/openssl/0.10.29/openssl/)
 
 ## Usage
 
