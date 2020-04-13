@@ -80,7 +80,6 @@ fn filter(event: DebouncedEvent) -> Option<DebouncedEvent> {
     match event {
         DebouncedEvent::NoticeWrite(_) => None,
         DebouncedEvent::NoticeRemove(_) => None,
-        DebouncedEvent::Chmod(_) => None,
         DebouncedEvent::Rescan => None,
         DebouncedEvent::Error(_, _) => None,
         _ => Some(event)
