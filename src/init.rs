@@ -12,6 +12,7 @@ pub enum InitError {
 
 fn create_dirsync_dirs() -> Result<(), std::io::Error> {
     fs::create_dir_all("./.dirsync/actions/onSyncDidFinish")?;
+    fs::create_dir_all("./.dirsync/actions/onSessionDidStart")?;
     Ok(())
 }
 

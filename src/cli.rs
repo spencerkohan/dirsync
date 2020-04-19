@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone)]
 pub enum SubCommand {
     #[structopt(name="init")]
-    Init(RemoteConfigRecord)
+    Init(RemoteConfigRecord),
+    #[structopt(name="clean")]
+    Clean,
 }
 
 #[derive(Debug)]
@@ -37,3 +39,4 @@ pub struct RemoteConfigRecord {
     #[structopt(short = "u", long = "user")]
     pub user: String,
 }
+

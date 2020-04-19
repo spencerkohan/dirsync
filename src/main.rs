@@ -20,12 +20,12 @@ fn rsync(config: &config::SessionConfig) {
     use std::process::Command;
 
     // we sync actions explicitly here, since they might be ignored otherwise
-    let dirsync_dir_local = &format!("{}/.dirsync/actions", &config.local_root);
+    let dirsync_dir_local = &format!("{}/.dirsync", &config.local_root);
     let dirsync_dir_remote = &format!("{}", &config.destination());
 
     let output = &Command::new("rsync")
     .arg("-v") // verbose output
-    .arg("-r")
+    .arg("-ar")
     .arg(dirsync_dir_local)
     .arg(dirsync_dir_remote)
     .output()
@@ -41,7 +41,7 @@ fn rsync(config: &config::SessionConfig) {
 
         let output = &Command::new("rsync")
         .arg("-v") // verbose output
-        .arg("-r")
+        .arg("-ar")
         .arg(format!("--exclude-from={}", config.exclude_path().to_str().unwrap()))
         .arg("--exclude-from=.gitignore")
         .arg(&config.local_root)
@@ -59,7 +59,7 @@ fn rsync(config: &config::SessionConfig) {
 
         let output = &Command::new("rsync")
         .arg("-v") // verbose output
-        .arg("-r")
+        .arg("-ar")
         .arg(format!("--exclude-from={}", config.exclude_path().to_str().unwrap()))
         .arg(&config.local_root)
         .arg(&config.destination())
@@ -92,7 +92,7 @@ fn start_main_loop(config: &SessionConfig) {
 
     rsync(&config);
     let mut remote = remote::Remote::connect(config);
-    remote.execute_if_exists("onSyncDidFinish");
+    remote.execute_if_exists("onSessionDidStart");
 
     // Create a channel to receive the events.
     let (tx, rx) = channel();
@@ -124,6 +124,11 @@ fn main() {
 
     match opts.subcommand {
         Some(SubCommand::Init(remote_config)) => init::init_dirsync_dir(remote_config).unwrap(),
+        Some(SubCommand::Clean) => {
+            let config = SessionConfig::get(opts);
+            let mut remote = remote::Remote::connect(&config);
+            remote.remove_dir(config.remote.root.as_str());
+        },
         _ => {
             let config = SessionConfig::get(opts);
             start_main_loop(&config);

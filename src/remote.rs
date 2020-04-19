@@ -100,4 +100,10 @@ impl Remote {
         self.exec_stream(&command2);
     }
 
+    pub fn remove_dir(&mut self, path: &str) {
+        let command = &format!("rm -rf {}", path);
+        let s = self.exec(&command);
+        print!("clean result: {}\n", s);
+    }
+
 }
