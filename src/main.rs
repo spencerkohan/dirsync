@@ -30,7 +30,7 @@ fn sync(config: &config::SessionConfig) {
         .args(args)
         .arg(source)
         .arg(destinatin)
-        .stdout(Stdio::inherit())
+        // .stdout(Stdio::inherit())
         .spawn()
         .expect("failed to execute rsync");
 
