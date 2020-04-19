@@ -97,11 +97,21 @@ The ignore file specifies paths which should not be synced by dirsync.  The form
 
 The `.dirsync/actions` directory houses executables which are triggered by certain dirsync events.
 
-Currently the only action supported is `onSyncDidFinish`.  This action is triggered after any sync event from the local to the remote (i.e. after a local file in the watched directory has changed, and the resulting sync has completed).
+When an event is triggered, dirsync will execute whatever file is located at the trigger location, i.e:
+
+```
+./dirsync/actions/<trigger name>/remote
+```
+
+Currently there are two action triggers:
+
+- `onSessionDidStart`:  This action is triggered when dirsync starts, after the initial sync from the local directory to the remote.
+
+- `onSyncDidFinish`:  This action is triggered after any sync event from the local to the remote (i.e. after a local file in the watched directory has changed, and the resulting sync has completed).
 
 What this means is, any script located at `.dirsync/actionos/onSyncDidFinish` will be executed on the remote following any sync event.
 
-So for example, if you were synchoronizing a rust project with your remote host, and you wanted to build the project every time a change is pushed, you could implement this `onSyncDidFinish` event:
+So for example, if you were synchoronizing a rust project with your remote host, and you wanted to build the project every time a change is pushed, you could implement this `onSyncDidFinish` event at `.dirsync/actionos/onSyncDidFinish/remote`
 
 ```
 #!/bin/bash

@@ -6,19 +6,22 @@ mod init;
 extern crate notify;
 
 use notify::{Watcher, RecursiveMode, watcher, DebouncedEvent};
-use std::sync::mpsc::channel;
+use std::sync::mpsc::{channel, Sender};
 use std::time::Duration;
 use crate::config::SessionConfig;
 use crate::cli::SubCommand;
 use crate::cli::CliOptions;
 use structopt::StructOpt;
 use std::path::Path;
-
+use std::thread;
+use std::sync::{Mutex, Arc};
+use std::vec::Vec;
+use crate::remote::Remote;
+use std::thread::sleep;
 
 // Perform rsync from source to destination
 fn sync(config: &config::SessionConfig) {
     use std::process::Command;
-    use std::process::Stdio;
 
     fn rsync(source: &str, destinatin: &str, args: &Vec<String>) {
         println!("executing rsync: {} {}", source, destinatin);
@@ -30,7 +33,6 @@ fn sync(config: &config::SessionConfig) {
         .args(args)
         .arg(source)
         .arg(destinatin)
-        // .stdout(Stdio::inherit())
         .spawn()
         .expect("failed to execute rsync");
 
@@ -75,35 +77,70 @@ fn filter(event: DebouncedEvent) -> Option<DebouncedEvent> {
     }
 }
 
+fn start_watch_thread(root: String, flush_signal: Sender<()>, events: &mut Arc<Mutex<Vec<DebouncedEvent>>>) {
+    let events = Arc::clone(events);
+    thread::spawn(move|| {
+
+         // Create a channel to receive watcher events.
+        let (tx, rx) = channel();
+        let mut watcher = watcher(tx, Duration::from_millis(20)).unwrap();
+        watcher.watch(root, RecursiveMode::Recursive).unwrap();
+
+
+
+        loop {
+            match rx.recv() {
+                Ok(event) => {
+                    println!("handling event: {:?}", event);
+                    match filter(event) {
+                        Some(event) => {
+                            let signal = flush_signal.clone();
+                            let mut events_vec = events.lock().unwrap();
+                            events_vec.push(event);
+                            thread::spawn(move|| {
+                                sleep(Duration::from_millis(20));
+                                signal.send(()).unwrap();
+                            });
+                        },
+                        None => println!("ignoring event")
+                    };
+
+                },
+                Err(e) => println!("watch error: {:?}", e),
+            }
+        }
+
+    });
+}
+
+fn flush_events(config: &SessionConfig, remote: &mut Remote,  events: &mut Arc<Mutex<Vec<DebouncedEvent>>>) {
+    let mut events_vec = events.lock().unwrap();
+    if !events_vec.is_empty() {
+        events_vec.clear();
+        sync(&config);
+        println!("Executing onSyncDidFinish action");
+        remote.execute_if_exists("onSyncDidFinish");
+    }
+}
+
 fn start_main_loop(config: &SessionConfig) {
     println!("config: {:?}", config);
 
     sync(&config);
-    let mut remote = remote::Remote::connect(config);
+    let mut remote = Remote::connect(config);
     remote.execute_if_exists("onSessionDidStart");
 
-    // Create a channel to receive the events.
+    let mut events: Arc<Mutex<Vec<DebouncedEvent>>> = Arc::new(Mutex::new(vec![]));
+
+    // create a channel for flush events
     let (tx, rx) = channel();
-    let mut watcher = watcher(tx, Duration::from_millis(20)).unwrap();
-    watcher.watch(config.local_root.clone(), RecursiveMode::Recursive).unwrap();
+    start_watch_thread(config.local_root.clone(), tx, &mut events);
 
     loop {
-        match rx.recv() {
-            Ok(event) => {
-                println!("handling event: {:?}", event);
-                match filter(event) {
-                    Some(_) => {
-                        sync(&config);
-                        println!("Executing onSyncDidFinish action");
-                        remote.execute_if_exists("onSyncDidFinish");
-                    },
-                    None => println!("ignoring event")
-                };
-
-            },
-            Err(e) => println!("watch error: {:?}", e),
-        }
+        let _ =  rx.recv();
+        flush_events(&config, &mut remote, &mut events);
     }
+
 }
 
 
