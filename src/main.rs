@@ -12,28 +12,32 @@ use crate::config::SessionConfig;
 use crate::cli::SubCommand;
 use crate::cli::CliOptions;
 use structopt::StructOpt;
-use std::io::prelude::*;
 use std::path::Path;
 
 
 // Perform rsync from source to destination
 fn sync(config: &config::SessionConfig) {
     use std::process::Command;
+    use std::process::Stdio;
 
     fn rsync(source: &str, destinatin: &str, args: &Vec<String>) {
-        let output = &Command::new("rsync")
+        println!("executing rsync: {} {}", source, destinatin);
+
+        let mut rsync = Command::new("rsync")
         .arg("-v") // verbose output
         .arg("-a") // archived: we use this to only sync files which have changed
         .arg("-r") // recursive
         .args(args)
         .arg(source)
         .arg(destinatin)
-        .output()
+        .stdout(Stdio::inherit())
+        .spawn()
         .expect("failed to execute rsync");
 
-        std::io::stdout().write_all(&output.stdout).unwrap();
-        std::io::stderr().write_all(&output.stderr).unwrap();
-        assert!(output.status.success());
+        let result = rsync.wait().expect("failed to wait for process");
+
+        println!("rsync finished");
+        assert!(result.success());
     }
 
     // we sync actions explicitly here, since they might be ignored otherwise
