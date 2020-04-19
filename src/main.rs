@@ -13,67 +13,52 @@ use crate::cli::SubCommand;
 use crate::cli::CliOptions;
 use structopt::StructOpt;
 use std::io::prelude::*;
+use std::path::Path;
 
 
 // Perform rsync from source to destination
-fn rsync(config: &config::SessionConfig) {
+fn sync(config: &config::SessionConfig) {
     use std::process::Command;
+
+    fn rsync(source: &str, destinatin: &str, args: &Vec<String>) {
+        let output = &Command::new("rsync")
+        .arg("-v") // verbose output
+        .arg("-a") // archived: we use this to only sync files which have changed
+        .arg("-r") // recursive
+        .args(args)
+        .arg(source)
+        .arg(destinatin)
+        .output()
+        .expect("failed to execute rsync");
+
+        std::io::stdout().write_all(&output.stdout).unwrap();
+        std::io::stderr().write_all(&output.stderr).unwrap();
+        assert!(output.status.success());
+    }
 
     // we sync actions explicitly here, since they might be ignored otherwise
     let dirsync_dir_local = &format!("{}/.dirsync", &config.local_root);
     let dirsync_dir_remote = &format!("{}", &config.destination());
+    rsync(dirsync_dir_local, dirsync_dir_remote, &Vec::new());
 
-    let output = &Command::new("rsync")
-    .arg("-v") // verbose output
-    .arg("-ar")
-    .arg(dirsync_dir_local)
-    .arg(dirsync_dir_remote)
-    .output()
-    .expect("failed to execute process");
+    let exclude_gitignore = config.ignore_gitignore &&  Path::new(".gitignore").exists();
+    let exclude_file = Path::new(config.exclude_path().to_str().unwrap()).exists();
 
-    println!("executing rsync: {} {}", &dirsync_dir_local, &dirsync_dir_remote);
-    println!("status: {}", output.status);
-    std::io::stdout().write_all(&output.stdout).unwrap();
-    std::io::stderr().write_all(&output.stderr).unwrap();
-    assert!(output.status.success());
-
-    if config.ignore_gitignore {
-
-        let output = &Command::new("rsync")
-        .arg("-v") // verbose output
-        .arg("-ar")
-        .arg(format!("--exclude-from={}", config.exclude_path().to_str().unwrap()))
-        .arg("--exclude-from=.gitignore")
-        .arg(&config.local_root)
-        .arg(&config.destination())
-        .output()
-        .expect("failed to execute process");
-
-        println!("executing rsync: {} {}", &config.local_root, &config.destination());
-        println!("status: {}", output.status);
-        std::io::stdout().write_all(&output.stdout).unwrap();
-        std::io::stderr().write_all(&output.stderr).unwrap();
-        assert!(output.status.success());
-
-    } else {
-
-        let output = &Command::new("rsync")
-        .arg("-v") // verbose output
-        .arg("-ar")
-        .arg(format!("--exclude-from={}", config.exclude_path().to_str().unwrap()))
-        .arg(&config.local_root)
-        .arg(&config.destination())
-        .output()
-        .expect("failed to execute process");
-
-        println!("executing rsync: {} {}", &config.local_root, &config.destination());
-        println!("status: {}", output.status);
-        std::io::stdout().write_all(&output.stdout).unwrap();
-        std::io::stderr().write_all(&output.stderr).unwrap();
-        assert!(output.status.success());
-
+    let mut args: Vec<String> = Vec::new();
+    if exclude_gitignore {
+        args.push(
+            String::from("--exclude-from=.gitignore")
+        );
+    }
+    if exclude_file {
+        args.push(
+            String::from(
+                format!("--exclude-from={}", config.exclude_path().to_str().unwrap())
+            )
+        );
     }
 
+    rsync(&config.local_root, &config.destination(), &args)
 }
 
 fn filter(event: DebouncedEvent) -> Option<DebouncedEvent> {
@@ -86,11 +71,10 @@ fn filter(event: DebouncedEvent) -> Option<DebouncedEvent> {
     }
 }
 
-
 fn start_main_loop(config: &SessionConfig) {
     println!("config: {:?}", config);
 
-    rsync(&config);
+    sync(&config);
     let mut remote = remote::Remote::connect(config);
     remote.execute_if_exists("onSessionDidStart");
 
@@ -105,7 +89,7 @@ fn start_main_loop(config: &SessionConfig) {
                 println!("handling event: {:?}", event);
                 match filter(event) {
                     Some(_) => {
-                        rsync(&config);
+                        sync(&config);
                         println!("Executing onSyncDidFinish action");
                         remote.execute_if_exists("onSyncDidFinish");
                     },
