@@ -1,23 +1,24 @@
-mod config;
-mod remote;
 mod cli;
+mod config;
 mod init;
+mod remote;
 
 extern crate notify;
 
-use notify::{Watcher, RecursiveMode, watcher, DebouncedEvent};
-use std::sync::mpsc::{channel, Sender};
-use std::time::Duration;
-use crate::config::SessionConfig;
-use crate::cli::SubCommand;
 use crate::cli::CliOptions;
-use structopt::StructOpt;
-use std::path::Path;
-use std::thread;
-use std::sync::{Mutex, Arc};
-use std::vec::Vec;
+use crate::cli::SubCommand;
+use crate::config::SessionConfig;
 use crate::remote::Remote;
+use clap::Parser;
+use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use std::path::Path;
+use std::process::exit;
+use std::sync::mpsc::{channel, Sender};
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::thread::sleep;
+use std::time::Duration;
+use std::vec::Vec;
 
 // Perform rsync from source to destination
 fn sync(config: &config::SessionConfig) {
@@ -27,14 +28,14 @@ fn sync(config: &config::SessionConfig) {
         println!("executing rsync: {} {}", source, destinatin);
 
         let mut rsync = Command::new("rsync")
-        .arg("-v") // verbose output
-        .arg("-a") // archived: we use this to only sync files which have changed
-        .arg("-r") // recursive
-        .args(args)
-        .arg(source)
-        .arg(destinatin)
-        .spawn()
-        .expect("failed to execute rsync");
+            .arg("-v") // verbose output
+            .arg("-a") // archived: we use this to only sync files which have changed
+            .arg("-r") // recursive
+            .args(args)
+            .arg(source)
+            .arg(destinatin)
+            .spawn()
+            .expect("failed to execute rsync");
 
         let result = rsync.wait().expect("failed to wait for process");
 
@@ -47,21 +48,18 @@ fn sync(config: &config::SessionConfig) {
     let dirsync_dir_remote = &format!("{}", &config.destination());
     rsync(dirsync_dir_local, dirsync_dir_remote, &Vec::new());
 
-    let exclude_gitignore = config.ignore_gitignore &&  Path::new(".gitignore").exists();
+    let exclude_gitignore = config.ignore_gitignore && Path::new(".gitignore").exists();
     let exclude_file = Path::new(config.exclude_path().to_str().unwrap()).exists();
 
     let mut args: Vec<String> = Vec::new();
     if exclude_gitignore {
-        args.push(
-            String::from("--exclude-from=.gitignore")
-        );
+        args.push(String::from("--exclude-from=.gitignore"));
     }
     if exclude_file {
-        args.push(
-            String::from(
-                format!("--exclude-from={}", config.exclude_path().to_str().unwrap())
-            )
-        );
+        args.push(String::from(format!(
+            "--exclude-from={}",
+            config.exclude_path().to_str().unwrap()
+        )));
     }
 
     rsync(&config.local_root, &config.destination(), &args)
@@ -73,20 +71,21 @@ fn filter(event: DebouncedEvent) -> Option<DebouncedEvent> {
         DebouncedEvent::NoticeRemove(_) => None,
         DebouncedEvent::Rescan => None,
         DebouncedEvent::Error(_, _) => None,
-        _ => Some(event)
+        _ => Some(event),
     }
 }
 
-fn start_watch_thread(root: String, flush_signal: Sender<()>, events: &mut Arc<Mutex<Vec<DebouncedEvent>>>) {
+fn start_watch_thread(
+    root: String,
+    flush_signal: Sender<()>,
+    events: &mut Arc<Mutex<Vec<DebouncedEvent>>>,
+) {
     let events = Arc::clone(events);
-    thread::spawn(move|| {
-
-         // Create a channel to receive watcher events.
+    thread::spawn(move || {
+        // Create a channel to receive watcher events.
         let (tx, rx) = channel();
         let mut watcher = watcher(tx, Duration::from_millis(20)).unwrap();
         watcher.watch(root, RecursiveMode::Recursive).unwrap();
-
-
 
         loop {
             match rx.recv() {
@@ -97,23 +96,25 @@ fn start_watch_thread(root: String, flush_signal: Sender<()>, events: &mut Arc<M
                             let signal = flush_signal.clone();
                             let mut events_vec = events.lock().unwrap();
                             events_vec.push(event);
-                            thread::spawn(move|| {
+                            thread::spawn(move || {
                                 sleep(Duration::from_millis(20));
                                 signal.send(()).unwrap();
                             });
-                        },
-                        None => println!("ignoring event")
+                        }
+                        None => println!("ignoring event"),
                     };
-
-                },
+                }
                 Err(e) => println!("watch error: {:?}", e),
             }
         }
-
     });
 }
 
-fn flush_events(config: &SessionConfig, remote: &mut Remote,  events: &mut Arc<Mutex<Vec<DebouncedEvent>>>) {
+fn flush_events(
+    config: &SessionConfig,
+    remote: &mut Remote,
+    events: &mut Arc<Mutex<Vec<DebouncedEvent>>>,
+) {
     let mut events_vec = events.lock().unwrap();
     if !events_vec.is_empty() {
         events_vec.clear();
@@ -137,25 +138,53 @@ fn start_main_loop(config: &SessionConfig) {
     start_watch_thread(config.local_root.clone(), tx, &mut events);
 
     loop {
-        let _ =  rx.recv();
+        let _ = rx.recv();
         flush_events(&config, &mut remote, &mut events);
     }
-
 }
 
-
 fn main() {
-    let opts = CliOptions::from_args();
+    let opts = CliOptions::parse();
 
     match opts.subcommand {
-        Some(SubCommand::Init(remote_config)) => init::init_dirsync_dir(remote_config).unwrap(),
+        Some(SubCommand::Init(remote_config)) => match init::init_dirsync_dir(remote_config) {
+            Ok(_) => {}
+            Err(err) => {
+                eprintln!("Error initializing dirsync: {}", err);
+                exit(1);
+            }
+        },
         Some(SubCommand::Clean) => {
-            let config = SessionConfig::get(opts);
+            let config = match SessionConfig::get(opts) {
+                Ok(config) => config,
+                Err(config::ReadSessionConfigError::DoesNotExist) => {
+                    eprintln!("Fatal: not a dirsync directory");
+                    eprintln!("There is no configuration file located at .dirsync/config.json");
+                    eprintln!("To initialize this as a dirsync directory, use: `dirsync init`");
+                    exit(1);
+                }
+                Err(err) => {
+                    eprintln!("Error loading configuration file: {}", err);
+                    exit(1);
+                }
+            };
             let mut remote = remote::Remote::connect(&config);
             remote.remove_dir(config.remote.root.as_str());
-        },
+        }
         _ => {
-            let config = SessionConfig::get(opts);
+            let config = match SessionConfig::get(opts) {
+                Ok(config) => config,
+                Err(config::ReadSessionConfigError::DoesNotExist) => {
+                    eprintln!("Fatal: not a dirsync directory");
+                    eprintln!("There is no configuration file located at .dirsync/config.json");
+                    eprintln!("To initialize this as a dirsync directory, use: `dirsync init`");
+                    exit(1);
+                }
+                Err(err) => {
+                    eprintln!("Error loading configuration file: {}", err);
+                    exit(1);
+                }
+            };
             start_main_loop(&config);
         }
     };

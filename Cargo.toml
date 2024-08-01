@@ -2,15 +2,15 @@
 name = "dirsync"
 version = "0.1.0"
 authors = ["Spencer Kohan <spencerkohan@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 notify = "4.0.12"
-# clap = { git = "https://github.com/clap-rs/clap/" }
-structopt = { version = "0.3" }
 serde = { version = "1.0.106", features = ["derive"] }
 serde_json = "1.0"
-ssh2 = "0.8"
+ssh2 = { version = "0.9", features = ["vendored-openssl"] }
 ssh_config = "0.1.0"
+clap = { version = "4.5.13", features = ["derive"] }
+thiserror = "1.0.63"
