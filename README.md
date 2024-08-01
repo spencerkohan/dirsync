@@ -13,7 +13,7 @@ The easiest way to install dirsync is with cargo install:
 $ git clone https://github.com/spencerkohan/dirsync && cd dirsync
 // install
 $ cargo install --path .
-``` 
+```
 
 ***Note:*** this crate relies on openssl to be installed on the system.  Instructions can be found [here](https://docs.rs/openssl/0.10.29/openssl/)
 
@@ -54,27 +54,29 @@ All configuration of `dirsync` is handled by the `.dirsync` directory, which is 
 ├── actions
 │   └── onSyncDidFinish
 │       └── remote
-├── config.json
+├── config.toml
 └── ignore
 ```
 
 The elements here are:
 
-#### config.json
+#### config.toml
 
 This is a file which contains the configuration options for specifying the remote host, and the remote directory.  It has this format:
 
 ```
-{
-    "remote": {
-        "root": "path/to/remote",
-        "host": "hostName",
-        "user": "userName",
-        "port": "22",               // optional
-        "identityFile": "id_rsa"    // optional
-    },
-    "ignoreGitignore" : true
-}
+ignoreGitignore =  true
+
+[remote]
+root = "path/to/remote/fs/root"
+host = "hostName"
+user = "userName"
+
+# optional - defaults to port 22
+port = "22"
+
+# optional - defaults to whatever identity file is specified in the .ssh config
+identityFile = "id_rsa"
 ```
 
 The felds are:
@@ -119,5 +121,3 @@ cargo build
 ```
 
 This script will always be executed from the root of the synced directory.
-
-

@@ -14,3 +14,4 @@ ssh2 = { version = "0.9", features = ["vendored-openssl"] }
 ssh_config = "0.1.0"
 clap = { version = "4.5.13", features = ["derive"] }
 thiserror = "1.0.63"
+toml = "0.8.19"

@@ -81,7 +81,7 @@ impl SessionConfig {
         let mut config_path = PathBuf::new();
         config_path.push(local_root.clone());
         config_path.push(".dirsync");
-        config_path.push("config.json");
+        config_path.push("config.toml");
 
         let config_string = match fs::read_to_string(config_path) {
             Ok(config_string) => config_string,
@@ -92,7 +92,7 @@ impl SessionConfig {
                 }
             },
         };
-        let config: Config = match serde_json::from_str(&config_string) {
+        let config: Config = match toml::from_str(&config_string) {
             Ok(config) => config,
             Err(err) => return Err(ReadSessionConfigError::FailedToDeserialzie(err.to_string())),
         };
