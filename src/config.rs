@@ -35,7 +35,7 @@ impl RemoteConfigRecord {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SessionConfig {
     // The root directory to sync to the remote
     pub local_root: String,

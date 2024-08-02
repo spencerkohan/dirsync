@@ -121,3 +121,49 @@ cargo build
 ```
 
 This script will always be executed from the root of the synced directory.
+
+## Syncing from the remote host
+
+Dirsync also supports syncing files from the remote host to the local host.
+
+This is achieved by using the `remote.receive_paths` configuration argument.
+
+So for instance, let's consider the case where we are working on a shared directory which looks like this:
+
+```
+/root
+  /src
+  /data-output
+```
+
+We want to sync the contents of the `root/src` directory from the local host, to the remote.  And we want to sync the contens of `root/data-output` from the remote back to the local host.
+
+In order to achieve this, first we initialize dirsync in the root directory:
+
+```
+@ dirsync init --user myUser --host myHost --root /home/myUser/remote-root
+```
+
+This will initialize our `config.toml` like so:
+
+```
+ignore_gitignore = true
+
+[remote]
+root = "/home/myUser/remote-root"
+host = "myHost"
+user = "myUser"
+```
+
+If we run `dirsync`, we will now be able to sync from the local directory to the `/home/myUser/remote-root` directory on the remote host.
+
+In order to enable syncing from the remote back to the local host, we can add the following to `config.toml`:
+
+```
+[[remote.receive_paths]]
+path = "data-output"
+```
+
+Here `path` is the path relative to the root which will be syncronized.  By default, any changes within the given path, or any subdirectory, recursively, will be syncronized.
+
+***Note***: syncing from the remote host requires rsync to be installed on the remote host.  If it is not available already, a matching version will be downloaded and installed.

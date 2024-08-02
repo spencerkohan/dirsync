@@ -20,12 +20,12 @@ fn create_dirsync_dirs() -> Result<(), std::io::Error> {
     Ok(())
 }
 
-pub fn init_dirsync_dir(remote_options: RemoteConfigRecord) -> Result<(), InitError> {
+pub fn init_dirsync_dir(remote_options: &RemoteConfigRecord) -> Result<(), InitError> {
     create_dirsync_dirs().map_err(|err| InitError::Io(err))?;
     let _ignore_file = File::create("./.dirsync/ignore").map_err(|err| InitError::Io(err))?;
     let mut config_file =
         File::create("./.dirsync/config.toml").map_err(|err| InitError::Io(err))?;
-    let config = Config::new(remote_options);
+    let config = Config::new(remote_options.clone());
     let json = toml::to_string_pretty(&config).map_err(|err| InitError::Toml(err.to_string()))?;
     config_file
         .write_all(json.as_bytes())

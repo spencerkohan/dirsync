@@ -1,41 +1,56 @@
-extern crate ssh2;
+pub mod cli;
+pub mod install_to_remote;
+pub mod receive_from_remote;
+pub mod remote_exec;
+
+pub use remote_exec::exec_remote;
+
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::path::PathBuf;
 
-use ssh2::Session;
-use ssh2::ExtendedData;
 use crate::config::SessionConfig;
-
+use remote_exec::RemoteExecError;
+use ssh2::ExtendedData;
+use ssh2::Session;
 
 pub struct Remote {
     session: ssh2::Session,
-    root: PathBuf
+    root: PathBuf,
 }
 
 impl Remote {
-
     // todo: this shouold take configuration arguemnts
     pub fn connect(config: &SessionConfig) -> Remote {
-        let tcp = TcpStream::connect(
-            &config.host_port_string().as_str()
-        ).unwrap();
+        let tcp = TcpStream::connect(&config.host_port_string().as_str()).unwrap();
         let mut sess = Session::new().unwrap();
         sess.set_tcp_stream(tcp);
         sess.handshake().unwrap();
-    
+
         // Try to authenticate with the first identity in the agent.
-        sess.userauth_agent(&config.remote.user.clone().as_str()).unwrap();
-    
+        sess.userauth_agent(&config.remote.user.clone().as_str())
+            .unwrap();
+
         // Make sure we succeeded
         assert!(sess.authenticated());
-    
-        let mut root = PathBuf::new();
-        root.push( &config.remote.root.clone() );
 
-        return Remote { 
+        let mut root = PathBuf::new();
+        root.push(&config.remote.root.clone());
+
+        return Remote {
             session: sess,
-            root: root
+            root,
+        };
+    }
+
+    pub fn try_exec(&mut self, command: &str) -> Result<(String, i32), RemoteExecError> {
+        let com = self.command(command)?;
+        match com.result_string() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(RemoteExecError::ExecError(
+                command.to_string(),
+                err.to_string(),
+            )),
         }
     }
 
@@ -45,9 +60,7 @@ impl Remote {
         let cmd = &format!("cd {} && {}", &path_str, &command);
 
         let channel = &mut self.session.channel_session().unwrap();
-        channel.exec(
-            &cmd
-        ).unwrap();
+        channel.exec(&cmd).unwrap();
 
         let mut s = String::new();
         channel.read_to_string(&mut s).unwrap();
@@ -64,12 +77,10 @@ impl Remote {
         let channel = &mut self.session.channel_session().unwrap();
 
         let mut channel_out = channel.stream(0);
-        
+
         channel.handle_extended_data(ExtendedData::Merge).unwrap();
         channel.request_pty("term", None, None).unwrap();
-        channel.exec(
-            &cmd
-        ).unwrap();
+        channel.exec(&cmd).unwrap();
 
         std::io::copy(&mut channel_out, &mut std::io::stdout()).unwrap();
         let _ = channel.wait_close();
@@ -90,12 +101,12 @@ impl Remote {
 
         if !self.file_exists(&path_str) {
             println!("file does not exist: {}", &path_str);
-            return
+            return;
         }
 
         let command1 = &format!("chmod +x {}", &path_str);
         let _ = self.exec(&command1);
-        
+
         let command2 = &format!("{}", &path_str);
         self.exec_stream(&command2);
     }
@@ -105,5 +116,4 @@ impl Remote {
         let s = self.exec(&command);
         print!("clean result: {}\n", s);
     }
-
 }

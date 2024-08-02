@@ -2,6 +2,7 @@ mod cli;
 mod config;
 mod init;
 mod remote;
+mod watch;
 
 extern crate notify;
 
@@ -11,6 +12,7 @@ use crate::config::SessionConfig;
 use crate::remote::Remote;
 use clap::Parser;
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use remote::receive_from_remote::watch_remote_receivable_paths;
 use std::path::Path;
 use std::process::exit;
 use std::sync::mpsc::{channel, Sender};
@@ -60,6 +62,13 @@ fn sync(config: &config::SessionConfig) {
             "--exclude-from={}",
             config.exclude_path().to_str().unwrap()
         )));
+    }
+
+    // exclude remote receive paths
+    if let Some(paths) = &config.remote.receive_paths {
+        for path in paths {
+            args.push(String::from(format!("--exclude={}", path.path)));
+        }
     }
 
     rsync(&config.local_root, &config.destination(), &args)
@@ -137,16 +146,30 @@ fn start_main_loop(config: &SessionConfig) {
     let (tx, rx) = channel();
     start_watch_thread(config.local_root.clone(), tx, &mut events);
 
+    watch_remote_receivable_paths(config.clone());
+
     loop {
         let _ = rx.recv();
         flush_events(&config, &mut remote, &mut events);
     }
 }
 
+pub fn version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+fn print_version() {
+    println!("{}", version());
+}
+
 fn main() {
     let opts = CliOptions::parse();
 
-    match opts.subcommand {
+    match &opts.subcommand {
+        Some(SubCommand::Version) => {
+            print_version();
+            exit(0);
+        }
         Some(SubCommand::Init(remote_config)) => match init::init_dirsync_dir(remote_config) {
             Ok(_) => {}
             Err(err) => {
@@ -171,6 +194,23 @@ fn main() {
             let mut remote = remote::Remote::connect(&config);
             remote.remove_dir(config.remote.root.as_str());
         }
+        Some(SubCommand::Remote { subcommand }) => {
+            let config = match SessionConfig::get(opts.clone()) {
+                Ok(config) => config,
+                Err(config::ReadSessionConfigError::DoesNotExist) => {
+                    eprintln!("Fatal: not a dirsync directory");
+                    eprintln!("There is no configuration file located at .dirsync/config.json");
+                    eprintln!("To initialize this as a dirsync directory, use: `dirsync init`");
+                    exit(1);
+                }
+                Err(err) => {
+                    eprintln!("Error loading configuration file: {}", err);
+                    exit(1);
+                }
+            };
+            subcommand.execute(&config);
+        }
+        Some(SubCommand::Watch { root, roots }) => watch::watch_paths(root, roots),
         _ => {
             let config = match SessionConfig::get(opts) {
                 Ok(config) => config,

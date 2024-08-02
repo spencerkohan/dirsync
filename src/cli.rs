@@ -1,6 +1,8 @@
 use clap::{Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
+use crate::remote::cli::RemoteSubcommand;
+
 #[derive(Debug, Subcommand, Clone)]
 pub enum SubCommand {
     #[command(arg_required_else_help = true, name = "init")]
@@ -10,6 +12,27 @@ pub enum SubCommand {
     #[command(name = "clean")]
     #[command(about = "Delete the contents of the remote directory")]
     Clean,
+
+    #[command(name = "remote")]
+    #[command(about = "Tools for working with the remote")]
+    Remote {
+        #[command(subcommand)]
+        subcommand: RemoteSubcommand,
+    },
+
+    #[command(name = "watch")]
+    #[command(about = "Watch a set of files, and emit any events")]
+    Watch {
+        #[arg(short, long)]
+        root: String,
+
+        #[arg(trailing_var_arg = true)]
+        roots: Vec<String>,
+    },
+
+    #[command(name = "version")]
+    #[command(about = "Print the current version")]
+    Version,
 }
 
 #[derive(Debug, Parser, Clone)]
@@ -33,6 +56,11 @@ pub struct CliOptions {
     pub subcommand: Option<SubCommand>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ReceivePathRec {
+    pub path: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, Args)]
 pub struct RemoteConfigRecord {
     /// The remote root of the sync directory
@@ -46,4 +74,7 @@ pub struct RemoteConfigRecord {
     /// The remote user
     #[arg(short, long)]
     pub user: String,
+
+    #[clap(skip)]
+    pub receive_paths: Option<Vec<ReceivePathRec>>,
 }
